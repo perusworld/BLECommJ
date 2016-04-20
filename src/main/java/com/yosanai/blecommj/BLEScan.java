@@ -122,6 +122,17 @@ public class BLEScan {
         }
     }
 
+
+    /**
+     * Cancle any ongoing scan
+     */
+    public void disconnect() {
+        if(bluetoothAdapter != null && scanCallback != null) {
+            bluetoothAdapter.stopLeScan(scanCallback);
+            this.callback = null;
+        }
+    }
+
     public void scan(long timeout, final boolean updateInfo, BLEScanCallback callbck) {
         this.callback = callbck;
         scanned.clear();
