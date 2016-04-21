@@ -97,6 +97,8 @@ public class ProtocolDataHandler extends SimpleDataHandler {
             bos.write(data.substring(from, to).getBytes());
         } catch (IOException e) {
             //NOOP
+        } catch (IndexOutOfBoundsException e) {
+            Log.e(TAG, "Index out of bounds", e);
         }
         bos.write(EOMFirst);
         bos.write(EOMSecond);
