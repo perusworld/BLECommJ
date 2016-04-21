@@ -137,6 +137,7 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
         Log.d(TAG, "Connecting.");
         this.bleObject = bleObject;
         scanValues = new ArrayList<>(Arrays.asList(BLEScan.SCANABLES));
+        bleObject.setAttempsToReadDeviceInfo(bleObject.getAttempsToReadDeviceInfo() + 1);
         gatt = bleObject.device.connectGatt(activity, false, this);
         connState = STATE_CONNECTING;
     }

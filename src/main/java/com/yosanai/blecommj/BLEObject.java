@@ -26,11 +26,14 @@ package com.yosanai.blecommj;
 
 import android.bluetooth.BluetoothDevice;
 
+import java.util.Comparator;
+
 /**
  * @author Saravana Perumal Shanmugam
  *
  */
-public class BLEObject {
+public class BLEObject implements Comparator<BLEObject> {
+
 
     protected BluetoothDevice device;
     protected String address;
@@ -41,9 +44,16 @@ public class BLEObject {
     protected String hardwareRevision;
     protected String firmwareRevision;
     protected String softwareRevision;
+    protected int rssi = Integer.MIN_VALUE;
+    protected int attempsToReadDeviceInfo = 0;
 
     public BLEObject() {
 
+    }
+
+    public BLEObject(BluetoothDevice device, String address, String name, int rssi) {
+        this(device, address, name);
+        this.rssi = rssi;
     }
 
     public BLEObject(BluetoothDevice device, String address, String name) {
@@ -128,4 +138,29 @@ public class BLEObject {
         return null != manufacturerName && null != modelNumber && null != serialNumber && null != hardwareRevision && null != firmwareRevision && null != softwareRevision;
     }
 
+    public int getRssi() {
+        return rssi;
+    }
+
+    public void setRssi(int rssi) {
+        this.rssi = rssi;
+    }
+
+    public int getAttempsToReadDeviceInfo() {
+        return attempsToReadDeviceInfo;
+    }
+
+    public void setAttempsToReadDeviceInfo(int attempsToReadDeviceInfo) {
+        this.attempsToReadDeviceInfo = attempsToReadDeviceInfo;
+    }
+
+    public int compare(BLEObject o1, BLEObject o2) {
+        int a = Math.abs(o1.getRssi());
+        int b = Math.abs(o2.getRssi());
+        return a > b ? +1 : a < b ? -1 : 0;
+    }
+
+    public int compareTo(BLEObject value) {
+        return compare(this, value);
+    }
 }

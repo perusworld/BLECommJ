@@ -31,10 +31,14 @@ import android.bluetooth.BluetoothManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Handler;
+import android.util.Log;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,6 +60,8 @@ public class BLEScan {
     public static final UUID FW_REV = BLEScan.getUUID("2A26");
     public static final UUID SW_REV = BLEScan.getUUID("2A28");
 
+    public static final int MAX_ATTEMPTS_READ_DEVICE_INFO = 3;
+
     public static final UUID[] SCANABLES = new UUID[]{
             MANU_NAME, MODEL_NUM, SERIAL_NUM, HW_REV, FW_REV, SW_REV
     };
@@ -66,6 +72,8 @@ public class BLEScan {
     UUID service;
     BLEScanCallback callback;
     Activity activity;
+    String mRequestedSerial, mRequestedModel;
+    boolean cancelled = false;
 
     public static UUID getUUID(String uuidStr) {
         UUID ret = null;
@@ -100,16 +108,53 @@ public class BLEScan {
         scan(timeout, false, callback);
     }
 
+    private boolean requestedDeviceFound() {
+        if(mRequestedSerial != null && mRequestedModel != null) {
+            for (BLEObject bleObj : scanned.values()) {
+                if (null != bleObj.getSerialNumber() && null != bleObj.getModelNumber()) {
+                    if(bleObj.getSerialNumber().equalsIgnoreCase(mRequestedSerial) &&
+                            bleObj.getModelNumber().equalsIgnoreCase(mRequestedModel)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public void updateDeviceInfo() {
+        if(cancelled) return;
+
+        // If we've found the device with the requested characteristics then we can finish
+        // There is no need to connect to all other devices and read these values
+        if(requestedDeviceFound()) {
+            Log.d(TAG, "Requested device found, no need to get device info for all devices");
+            callback.onDone(scanned.values());
+            return;
+        }
+
         boolean done = true;
+
+        // Sort the list by proximity - connecting to the nearest first
         BLEDeviceInfoService infoService = new BLEDeviceInfoService(new BLEDeviceInfoServiceCallback() {
             @Override
             public void onDone() {
                 updateDeviceInfo();
             }
         }, activity);
-        for (BLEObject bleObj : scanned.values()) {
-            if (null == bleObj.getSerialNumber()) {
+
+        List<Map.Entry<String, BLEObject>> scannedList =
+                new LinkedList<Map.Entry<String, BLEObject>>(scanned.entrySet());
+        Collections.sort(scannedList, new Comparator<Map.Entry<String, BLEObject>>() {
+            public int compare(Map.Entry<String, BLEObject> o1,
+                               Map.Entry<String, BLEObject> o2) {
+                return (o1.getValue()).compareTo(o2.getValue());
+            }
+        });
+
+        for (Map.Entry<String, BLEObject> res : scannedList) {
+            BLEObject bleObj = res.getValue();
+            if (null == bleObj.getSerialNumber() && bleObj.getAttempsToReadDeviceInfo() < MAX_ATTEMPTS_READ_DEVICE_INFO) {
                 infoService.readDeviceInfo(bleObj);
                 done = false;
                 break;
@@ -127,13 +172,25 @@ public class BLEScan {
      * Cancle any ongoing scan
      */
     public void disconnect() {
+        cancelled = true;
         if(bluetoothAdapter != null && scanCallback != null) {
             bluetoothAdapter.stopLeScan(scanCallback);
             this.callback = null;
         }
     }
 
-    public void scan(long timeout, final boolean updateInfo, BLEScanCallback callbck) {
+    /**
+     * Allow a user to search for devices with particular characteristics
+     *
+     * @param timeout
+     * @param updateInfo
+     * @param callbck
+     * @param requestedModel
+     * @param requestedSerial
+     */
+    public void scan(long timeout, final boolean updateInfo, BLEScanCallback callbck, String requestedModel, String requestedSerial) {
+        this.mRequestedModel = requestedModel;
+        this.mRequestedSerial = requestedSerial;
         this.callback = callbck;
         scanned.clear();
         handler.postDelayed(new Runnable() {
@@ -141,6 +198,7 @@ public class BLEScan {
             public void run() {
                 bluetoothAdapter.stopLeScan(scanCallback);
                 if (updateInfo) {
+                    Log.d(TAG, "Got advertisements from " + scanned.size() + " devices");
                     updateDeviceInfo();
                 } else if (null != callback) {
                     callback.onDone(scanned.values());
@@ -152,6 +210,11 @@ public class BLEScan {
         } else {
             bluetoothAdapter.startLeScan(new UUID[]{service}, scanCallback);
         }
+
+    }
+
+    public void scan(long timeout, final boolean updateInfo, BLEScanCallback callbck) {
+        this.scan(timeout, updateInfo, callbck, null, null);
     }
 
     private BluetoothAdapter.LeScanCallback scanCallback =
@@ -160,9 +223,13 @@ public class BLEScan {
                 @Override
                 public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
                     if (scanned.containsKey(device.getAddress())) {
-                        scanned.get(device.getAddress()).device = device;
+                        BLEObject previousScan = scanned.get(device.getAddress());
+                        previousScan.device = device;
+                        if(Math.abs(previousScan.getRssi())> Math.abs(rssi)) {
+                            previousScan.setRssi(rssi);   //update rssi if new scan is closer
+                        }
                     } else {
-                        scanned.put(device.getAddress(), new BLEObject(device, device.getAddress(), device.getName()));
+                        scanned.put(device.getAddress(), new BLEObject(device, device.getAddress(), device.getName(), rssi));
                     }
                 }
             };
