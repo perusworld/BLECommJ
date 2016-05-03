@@ -30,12 +30,15 @@ import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.LogRecord;
 
 /**
  * @author Saravana Perumal Shanmugam
@@ -50,6 +53,7 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
     private BLEDeviceInfoServiceCallback callback;
     private Activity activity;
     private int connState = STATE_DISCONNECTED;
+    private int timeout = 1000;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
@@ -57,9 +61,25 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
 
     List<UUID> scanValues;
 
-    public BLEDeviceInfoService(BLEDeviceInfoServiceCallback callback, Activity activity) {
+    private Handler handler;
+
+    private Runnable deviceInfoTimeout = new Runnable() {
+        @Override
+        public void run() {
+            connState = STATE_DISCONNECTED;
+            Log.i(TAG, "Timed out connecting to ble object.");
+            handler.removeCallbacks(deviceInfoTimeout);
+
+            cleanup();
+            callback.onDone();
+        }
+    };
+
+    public BLEDeviceInfoService(BLEDeviceInfoServiceCallback callback, Activity activity, int timeout) {
         this.callback = callback;
         this.activity = activity;
+        this.timeout = timeout;
+        handler = new Handler(Looper.getMainLooper());
     }
 
     @Override
@@ -74,8 +94,11 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
             connState = STATE_DISCONNECTED;
             Log.i(TAG, "Disconnected from ble object.");
-            callback.onDone();
+            handler.removeCallbacks(deviceInfoTimeout);
+//            callback.onDone();
+
             cleanup();
+            callback.onDone();
         }
     }
 
@@ -103,21 +126,26 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
 
     @Override
     public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-        if (characteristic.getUuid().equals(BLEScan.MANU_NAME)) {
-            bleObject.setManufacturerName(characteristic.getStringValue(0));
-        } else if (characteristic.getUuid().equals(BLEScan.MODEL_NUM)) {
-            bleObject.setModelNumber(characteristic.getStringValue(0));
-        } else if (characteristic.getUuid().equals(BLEScan.SERIAL_NUM)) {
-            bleObject.setSerialNumber(characteristic.getStringValue(0));
-        } else if (characteristic.getUuid().equals(BLEScan.HW_REV)) {
-            bleObject.setHardwareRevision(characteristic.getStringValue(0));
-        } else if (characteristic.getUuid().equals(BLEScan.FW_REV)) {
-            bleObject.setFirmwareRevision(characteristic.getStringValue(0));
-        } else if (characteristic.getUuid().equals(BLEScan.SW_REV)) {
-            bleObject.setSoftwareRevision(characteristic.getStringValue(0));
-        } else {
-            Log.e(TAG, "Unknown characteristic " + characteristic.getUuid().toString());
+        try {
+            if (characteristic.getUuid().equals(BLEScan.MANU_NAME)) {
+                bleObject.setManufacturerName(characteristic.getStringValue(0));
+            } else if (characteristic.getUuid().equals(BLEScan.MODEL_NUM)) {
+                bleObject.setModelNumber(characteristic.getStringValue(0));
+            } else if (characteristic.getUuid().equals(BLEScan.SERIAL_NUM)) {
+                bleObject.setSerialNumber(characteristic.getStringValue(0));
+            } else if (characteristic.getUuid().equals(BLEScan.HW_REV)) {
+                bleObject.setHardwareRevision(characteristic.getStringValue(0));
+            } else if (characteristic.getUuid().equals(BLEScan.FW_REV)) {
+                bleObject.setFirmwareRevision(characteristic.getStringValue(0));
+            } else if (characteristic.getUuid().equals(BLEScan.SW_REV)) {
+                bleObject.setSoftwareRevision(characteristic.getStringValue(0));
+            } else {
+                Log.e(TAG, "Unknown characteristic " + characteristic.getUuid().toString());
+            }
+        } catch (Exception e) {
+            // NOOP - just don't crash getting the length of a null array - this means that gatt disconnect would never get called
         }
+
         if (bleObject.hasDeviceInfo()) {
             disconnect();
         } else if (!scanValues.isEmpty()) {
@@ -131,6 +159,9 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
         }
         gatt = null;
         bleObject = null;
+        if(handler != null) {
+            handler.removeCallbacks(deviceInfoTimeout);
+        }
     }
 
     public void readDeviceInfo(BLEObject bleObject) {
@@ -140,6 +171,7 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
         bleObject.setAttempsToReadDeviceInfo(bleObject.getAttempsToReadDeviceInfo() + 1);
         gatt = bleObject.device.connectGatt(activity, false, this);
         connState = STATE_CONNECTING;
+        handler.postDelayed(deviceInfoTimeout, timeout);
     }
 
     public void disconnect() {

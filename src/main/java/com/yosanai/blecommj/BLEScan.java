@@ -61,6 +61,7 @@ public class BLEScan {
     public static final UUID SW_REV = BLEScan.getUUID("2A28");
 
     public static final int MAX_ATTEMPTS_READ_DEVICE_INFO = 3;
+    public static final int CONNECTION_TIMEOUT = 3000;
 
     public static final UUID[] SCANABLES = new UUID[]{
             MANU_NAME, MODEL_NUM, SERIAL_NUM, HW_REV, FW_REV, SW_REV
@@ -127,7 +128,7 @@ public class BLEScan {
 
         // If we've found the device with the requested characteristics then we can finish
         // There is no need to connect to all other devices and read these values
-        if(requestedDeviceFound()) {
+        if(requestedDeviceFound() && callback != null) {
             Log.d(TAG, "Requested device found, no need to get device info for all devices");
             callback.onDone(scanned.values());
             return;
@@ -141,7 +142,7 @@ public class BLEScan {
             public void onDone() {
                 updateDeviceInfo();
             }
-        }, activity);
+        }, activity, CONNECTION_TIMEOUT);
 
         List<Map.Entry<String, BLEObject>> scannedList =
                 new LinkedList<Map.Entry<String, BLEObject>>(scanned.entrySet());
@@ -162,7 +163,7 @@ public class BLEScan {
                 //NOOP
             }
         }
-        if (done) {
+        if (done && callback != null) {
             callback.onDone(scanned.values());
         }
     }
@@ -173,10 +174,11 @@ public class BLEScan {
      */
     public void disconnect() {
         cancelled = true;
+        Log.d(TAG, "Disconnect: cancelled:" + cancelled );
         if(bluetoothAdapter != null && scanCallback != null) {
             bluetoothAdapter.stopLeScan(scanCallback);
-            this.callback = null;
         }
+        this.callback = null;
     }
 
     /**

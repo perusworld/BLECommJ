@@ -36,6 +36,7 @@ import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Handler;
 import android.util.Log;
 
 import java.util.Arrays;
@@ -72,6 +73,20 @@ public class DefaultBLEComm extends BluetoothGattCallback implements BLEComm {
     private BluetoothGattCharacteristic txChr;
     private BluetoothGattCharacteristic rxChr;
 
+    private Handler handler;
+
+    private Runnable deviceInfoTimeout = new Runnable() {
+        @Override
+        public void run() {
+            Log.i(TAG, "Timed out connecting to ble object.");
+            handler.removeCallbacks(deviceInfoTimeout);
+
+            if (null != callback) {
+                callback.onDisconnect();
+            }
+            cleanup();
+        }
+    };
     public DefaultBLEComm() {
 
     }
