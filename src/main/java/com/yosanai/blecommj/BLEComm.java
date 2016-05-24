@@ -42,4 +42,5 @@ public interface BLEComm {
     public void writeRawData(byte[] rawData);
     public void disconnect();
     public void postConnection();
+    public void cleanup();
 }
