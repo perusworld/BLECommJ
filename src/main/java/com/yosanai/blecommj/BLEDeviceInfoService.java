@@ -53,7 +53,7 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
     private BLEDeviceInfoServiceCallback callback;
     private Activity activity;
     private int connState = STATE_DISCONNECTED;
-    private int timeout = 1000;
+    private int timeout = 5000;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
@@ -67,11 +67,11 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
         @Override
         public void run() {
             connState = STATE_DISCONNECTED;
-            Log.i(TAG, "Timed out connecting to ble object.");
+            Log.i(TAG, "Timed out connecting to ble object." + (bleObject != null ? bleObject.getAddress() : ""));
             handler.removeCallbacks(deviceInfoTimeout);
-
             cleanup();
             callback.onDone();
+
         }
     };
 
@@ -84,21 +84,20 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
 
     @Override
     public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-        String intentAction;
         if (newState == BluetoothProfile.STATE_CONNECTED) {
             connState = STATE_CONNECTED;
-            Log.i(TAG, "Connected to ble object.");
+            Log.i(TAG, "Connected to ble object." + (bleObject != null ? bleObject.getAddress() : ""));
             Log.i(TAG, "start service discovery:" +
                     gatt.discoverServices());
 
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
             connState = STATE_DISCONNECTED;
-            Log.i(TAG, "Disconnected from ble object.");
+            Log.i(TAG, "Disconnected from ble object." + (bleObject != null ? bleObject.getAddress() : ""));
             handler.removeCallbacks(deviceInfoTimeout);
-//            callback.onDone();
-
             cleanup();
             callback.onDone();
+
+
         }
     }
 
@@ -111,11 +110,14 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
     }
 
     public void readCharacteristics() {
-        BluetoothGattService infoService = gatt.getService(BLEScan.DEVICE_INFO);
-        if (null != infoService && !scanValues.isEmpty()) {
-            BluetoothGattCharacteristic chr = infoService.getCharacteristic(scanValues.remove(0));
-            if (null != chr) {
-                gatt.readCharacteristic(chr);
+        if(gatt != null) {
+            BluetoothGattService infoService = gatt.getService(BLEScan.DEVICE_INFO);
+            if (null != infoService && !scanValues.isEmpty()) {
+                BluetoothGattCharacteristic chr = infoService.getCharacteristic(scanValues.remove(0));
+                if (null != chr) {
+                    Log.d(TAG, "readCharacteristics");
+                    gatt.readCharacteristic(chr);
+                }
             }
         }
     }
@@ -144,28 +146,37 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
             }
         } catch (Exception e) {
             // NOOP - just don't crash getting the length of a null array - this means that gatt disconnect would never get called
+            Log.e(TAG, "Ex: ", e);
         }
 
         if (bleObject.hasDeviceInfo()) {
+            Log.d(TAG, "read ALL device info");
             disconnect();
         } else if (!scanValues.isEmpty()) {
+            Log.d(TAG, "read more characteristics");
             readCharacteristics();
         }
     }
 
     public void cleanup() {
-        if (null != gatt) {
-            gatt.close();
-        }
-        gatt = null;
-        bleObject = null;
-        if(handler != null) {
-            handler.removeCallbacks(deviceInfoTimeout);
+        try {
+            Log.d(TAG, "cleanup");
+            if (null != gatt) {
+                Log.d(TAG, "gatt.close");
+                gatt.close();
+            }
+            gatt = null;
+            bleObject = null;
+            if (handler != null) {
+                handler.removeCallbacks(deviceInfoTimeout);
+            }
+        }catch (Exception e) {
+            Log.e(TAG, "Error cleaning up", e);
         }
     }
 
     public void readDeviceInfo(BLEObject bleObject) {
-        Log.d(TAG, "Connecting.");
+        Log.d(TAG, "Connecting to ." + bleObject.getAddress());
         this.bleObject = bleObject;
         scanValues = new ArrayList<>(Arrays.asList(BLEScan.SCANABLES));
         bleObject.setAttempsToReadDeviceInfo(bleObject.getAttempsToReadDeviceInfo() + 1);
@@ -176,6 +187,7 @@ public class BLEDeviceInfoService extends BluetoothGattCallback {
 
     public void disconnect() {
         if (null != gatt) {
+            Log.d(TAG, "gatt.disconnect");
             gatt.disconnect();
         }
     }
