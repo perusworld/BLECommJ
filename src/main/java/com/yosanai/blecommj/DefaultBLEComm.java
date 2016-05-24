@@ -73,20 +73,7 @@ public class DefaultBLEComm extends BluetoothGattCallback implements BLEComm {
     private BluetoothGattCharacteristic txChr;
     private BluetoothGattCharacteristic rxChr;
 
-    private Handler handler;
 
-    private Runnable deviceInfoTimeout = new Runnable() {
-        @Override
-        public void run() {
-            Log.i(TAG, "Timed out connecting to ble object.");
-            handler.removeCallbacks(deviceInfoTimeout);
-
-            if (null != callback) {
-                callback.onDisconnect();
-            }
-            cleanup();
-        }
-    };
     public DefaultBLEComm() {
 
     }
@@ -132,11 +119,10 @@ public class DefaultBLEComm extends BluetoothGattCallback implements BLEComm {
                     gatt.discoverServices());
 
         } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-            Log.i(TAG, "Disconnected from ble object.");
+            Log.i(TAG, "STATE_DISCONNECTED");
             if (null != callback) {
                 callback.onDisconnect();
             }
-            this.cleanup();
         }
     }
 
@@ -238,10 +224,16 @@ public class DefaultBLEComm extends BluetoothGattCallback implements BLEComm {
     @Override
     public boolean connect(Activity activity, String address) {
         boolean ret = false;
-        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
-        if (null != device) {
-            gatt = device.connectGatt(activity, false, this);
-            ret = true;
+        if(bluetoothAdapter != null) {
+            BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
+            if (null != device) {
+                Log.d(TAG, "connect to device");
+                gatt = device.connectGatt(activity, false, this);
+                ret = true;
+            }
+            else {
+                Log.d(TAG, "already had connection");
+            }
         }
         return ret;
     }
@@ -255,7 +247,7 @@ public class DefaultBLEComm extends BluetoothGattCallback implements BLEComm {
 
     @Override
     public void writeRawData(byte[] rawData) {
-        if (null != txChr) {
+        if (null != txChr && gatt != null) {
             txChr.setValue(rawData);
             gatt.writeCharacteristic(txChr);
         }
@@ -263,7 +255,9 @@ public class DefaultBLEComm extends BluetoothGattCallback implements BLEComm {
 
     @Override
     public void disconnect() {
+
         if (null != gatt) {
+            Log.d(TAG, "disconnect");
             gatt.disconnect();
         }
     }
