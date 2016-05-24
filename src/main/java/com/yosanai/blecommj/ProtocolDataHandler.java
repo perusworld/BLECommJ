@@ -91,7 +91,7 @@ public class ProtocolDataHandler extends SimpleDataHandler {
     protected void writeString(String data, int from, int to) {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         boolean chunked = !(from == 0 && to == data.length());
-        Log.d(TAG, "Chunked " + chunked + " from " + from + " to " + to);
+        Log.d(TAG, "Write:" + data);
         bos.write(chunked ? ((loc == 0) ? ChunkedDataStart : (to == data.length()? ChunkedDataEnd : ChunkedData)): Data);
         try {
             bos.write(data.substring(from, to).getBytes());
