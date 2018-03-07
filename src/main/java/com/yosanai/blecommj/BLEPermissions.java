@@ -30,7 +30,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.support.annotation.NonNull;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -78,7 +77,7 @@ public class BLEPermissions {
         return ret;
     }
 
-    public Status checkRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public Status checkRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         Status ret = Status.UNKNOWN;
         if (null == permsToCheck || permsToCheck.isEmpty()) {
             // NOOP
