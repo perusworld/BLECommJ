@@ -1,18 +1,17 @@
 /**
- *
  * This is the MIT License
  * http://www.opensource.org/licenses/mit-license.php
- *
+ * <p>
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- *
+ * <p>
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * <p>
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -20,7 +19,6 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
- *
  */
 package com.yosanai.blecommj;
 
@@ -32,17 +30,12 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
  * @author Saravana Perumal Shanmugam
- *
  */
 public class BLEScan {
 
@@ -66,6 +59,18 @@ public class BLEScan {
     UUID service;
     BLEScanCallback callback;
     Activity activity;
+    private BluetoothAdapter.LeScanCallback scanCallback =
+            new BluetoothAdapter.LeScanCallback() {
+
+                @Override
+                public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
+                    if (scanned.containsKey(device.getAddress())) {
+                        scanned.get(device.getAddress()).device = device;
+                    } else {
+                        scanned.put(device.getAddress(), new BLEObject(device, device.getAddress(), device.getName()));
+                    }
+                }
+            };
 
     public static UUID getUUID(String uuidStr) {
         UUID ret = null;
@@ -142,19 +147,6 @@ public class BLEScan {
             bluetoothAdapter.startLeScan(new UUID[]{service}, scanCallback);
         }
     }
-
-    private BluetoothAdapter.LeScanCallback scanCallback =
-            new BluetoothAdapter.LeScanCallback() {
-
-                @Override
-                public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
-                    if (scanned.containsKey(device.getAddress())) {
-                        scanned.get(device.getAddress()).device = device;
-                    } else {
-                        scanned.put(device.getAddress(), new BLEObject(device, device.getAddress(), device.getName()));
-                    }
-                }
-            };
 
 
 }
